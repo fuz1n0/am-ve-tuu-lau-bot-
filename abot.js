@@ -18,9 +18,9 @@ const client = new Client({
 
 // 🛑 THIẾT LẬP ID LÃNH ĐỊA & QUYỀN LỰC (Lão Bản nhớ điền vào nha)
 const PREFIX = 'tn';
-const ROLE_TU_NHAN_ID = 'ĐIỀN_ID_ROLE_TÙ_NHÂN_Ở_ĐÂY';   // Role cho bọn tội nặng (hắc địa lao)
-const ROLE_TAP_DICH_ID = 'ĐIỀN_ID_ROLE_TÙ_MỌT_GÔNG_Ở_ĐÂY'; // Role cho bọn tội nhẹ đi quét rác
-const CATEGORY_TIEU_DAO_ID = 'ĐIỀN_ID_CATEGORY_TIEU_DAO_Ở_ĐÂY'; // ID của cái thư mục chứa 3 kênh phạt
+const ROLE_TU_NHAN_ID = '1537469644993208412';   // Role cho bọn tội nặng (hắc địa lao)
+const ROLE_TAP_DICH_ID = '1550432222027321374'; // Role cho bọn tội nhẹ đi quét rác
+const CATEGORY_TIEU_DAO_ID = '1369689684997050431'; // ID của cái thư mục chứa 3 kênh phạt
 
 // Bộ nhớ đệm giữ dữ liệu
 const activeJails = new Map(); // Sổ tay nhốt bọn tội nặng (Hardmode)
