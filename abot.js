@@ -3,13 +3,11 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, PermissionsBitField } = require('discord.js');
 const express = require('express');
 
-// 🛑 1. TRẠM GÁC ĐỂ BOT KHÔNG NGỦ TRÊN RENDER
+// 🛑 1. TRẠM GÁC RENDER
 const app = express();
-app.get('/', (req, res) => res.send('Ám Vệ đang canh gác! Thằng nào ho he là vả mõm ngay!'));
-const port = Number(process.env.PORT) || 3000;
-const server = app.listen(port, () => console.log(`Trạm gác Ám Vệ đã lên sóng cổng ${port}!`));
+app.get('/', (req, res) => res.send('Ám Vệ Quách Linh Chi đang canh gác Tiêu Dao Các!'));
+app.listen(process.env.PORT || 3000, () => console.log('Trạm gác đã lên sóng!'));
 
-// 🛑 2. KHỞI TẠO ÁM VỆ
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -18,119 +16,128 @@ const client = new Client({
     ]
 });
 
-// Cuốn sổ tử thần: Ghi nhớ những thằng đang bị spam để còn biết mà tắt
-const activeJails = new Map();
+// 🛑 THIẾT LẬP ID LÃNH ĐỊA & QUYỀN LỰC (Lão Bản nhớ điền vào nha)
+const PREFIX = 'tn';
+const ROLE_TU_NHAN_ID = 'ĐIỀN_ID_ROLE_TÙ_NHÂN_Ở_ĐÂY';   // Role cho bọn tội nặng (hắc địa lao)
+const ROLE_TAP_DICH_ID = 'ĐIỀN_ID_ROLE_TÙ_MỌT_GÔNG_Ở_ĐÂY'; // Role cho bọn tội nhẹ đi quét rác
+const CATEGORY_TIEU_DAO_ID = 'ĐIỀN_ID_CATEGORY_TIEU_DAO_Ở_ĐÂY'; // ID của cái thư mục chứa 3 kênh phạt
 
-// 🛑 3. KHO VĂN TẾ ĐÁ XÉO TÂM LÝ (KHÔNG CHỬI BẬY - NÉ BOT DISCORD)
+// Bộ nhớ đệm giữ dữ liệu
+const activeJails = new Map(); // Sổ tay nhốt bọn tội nặng (Hardmode)
+const laborQuotas = new Map(); // Sổ chấm công bọn quét rác (tnlaudon)
+
+// 🛑 KHO VĂN TẾ (ĐÃ UPDATE THÊM HỎA LỰC)
 const vanTe = [
-    "Ê {user}, bộ não của ngươi chắc được bảo quản trong lồng kính kỹ lắm nhỉ, vì có vẻ từ lúc đẻ ra chưa từng được đem ra sử dụng.",
+    "Ê {user}, nghe đồn nếp nhăn trên não ngươi còn ít hơn số lần ngươi được người khác khen ngợi trong đời.",
     "Tiết kiệm tiền ăn sáng của mẹ mấy tháng mới thuê được cái tool rách này thế nhóc {user}? Mỏi tay chưa?",
-    "{user} à, sự tồn tại của ngươi trong server này đúng là minh chứng hùng hồn cho việc: Không phải ai có bàn phím cũng biết cách làm người.",
-    "Gào to lên {user}! Khóc to nữa lên! Ở trong cái chuồng này vách cách âm tốt lắm. Cứ tận hưởng sự bất lực đi con.",
+    "Sự tồn tại của {user} trong server này đúng là minh chứng cho việc: Không phải ai có bàn phím cũng biết cách làm người.",
+    "Nếu sự thiếu hiểu biết mà có thể phát điện, chắc {user} đủ sức thắp sáng cả cái server này rồi đấy.",
     "Tưởng hacker thế nào, hóa ra {user} cũng chỉ là linh trưởng múa phím dọa khỉ. Uống sữa rồi đi ngủ đi mai còn đi học.",
-    "Thật sự quan ngại cho hệ sinh thái khi phải chia sẻ oxy với một cá thể tiến hóa lùi như {user}.",
-    "Nhìn {user} gõ phím mà ta thấy tội nghiệp thay cho cái bàn phím. Mất công sản xuất ra lại để cho một đứa không có tư duy sử dụng."
+    "Mỗi lần {user} gõ phím, ta lại thấy xót xa cho những nơ-ron thần kinh đang phải chết mòn vì cố hiểu logic của ngươi.",
+    "Chắc hồi bé {user} bị rơi mất sách Đạo Đức, giờ lớn lên mới hành xử như một hệ điều hành bị lỗi win thế này.",
+    "Khóc to lên {user}! Gào thét đi! Ở trong này vách cách âm tốt lắm, gõ gãy bàn phím cũng chẳng ai thèm đọc đâu."
 ];
 
 client.on('messageCreate', async (message) => {
-    // Bỏ qua tin nhắn của bot khác kẻo 2 con bot tự chửi nhau
-    if (message.author.bot) return;
+    if (!message.content.startsWith(PREFIX) || message.author.bot) return;
 
-    // 🛑 4. LỆNH CHẾT CHÓC: tnhardmode
-    if (message.content.startsWith('tnhardmode')) {
-        
-        // KIỂM TRA QUYỀN LỰC: Chỉ những người có quyền "Manage Server" (Lão Bản & Admin) mới được xài lệnh này
-        if (!message.member?.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
-            return message.reply("Trình độ tép riu mà đòi cầm lệnh bài của Lão Bản à? Cút về sảnh chính!");
+    // 🛑 KIỂM TRA LÃNH ĐỊA HOẠT ĐỘNG
+    // Ám vệ chỉ làm việc nếu kênh đang chat nằm trong Danh mục "Tiêu Dao"
+    if (message.channel.parentId !== CATEGORY_TIEU_DAO_ID) {
+        // Chỉ hiện thông báo nếu cố tình xài lệnh Admin ở ngoài
+        if (['phattu', 'thathu', 'hardmode', 'tu'].some(cmd => message.content.includes(cmd))) {
+            return message.reply("❌ Ám Vệ ta chỉ nhận lệnh ở khu vực Tiêu Dao! Đừng lôi ta ra ngoài sảnh lớn làm loạn!");
+        }
+        return; // Các lệnh khác ở ngoài thì bơ luôn
+    }
+
+    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
+    const command = args.shift().toLowerCase(); 
+
+    // ==========================================
+    // KHU VỰC 1: DÀNH CHO TỘI NHÂN (TỰ GÕ LỆNH)
+    // ==========================================
+    if (['laudon', 'xamhoi'].includes(command)) {
+        if (!laborQuotas.has(message.author.id)) {
+            return message.reply("Ngươi có tội tình gì đâu mà giành việc quét rác? Rảnh quá thì ra sảnh uống trà đi!");
         }
 
-        const args = message.content.split(' ');
-        const command = args[1]; // 'on' hoặc 'off'
-        const targetMember = message.mentions.members.first();
+        let count = laborQuotas.get(message.author.id);
+        count -= 1; // Trừ đi 1 lần gõ
 
-        if (!targetMember) return message.reply("Mắt để trưng à? Phải tag cái thằng cần xích vào lệnh chứ!");
+        if (count > 0) {
+            laborQuotas.set(message.author.id, count);
+            return message.reply(`🧹 Đã quét xong 1 chổi! Ngươi còn nợ **${count} lần** nữa mới được thả! Cố lên con trai!`);
+        } else {
+            // Hết nợ -> Thả tự do
+            laborQuotas.delete(message.author.id);
+            await message.member.roles.remove(ROLE_TAP_DICH_ID);
+            return message.channel.send(`🕊️ Lão Bản ân chuẩn! <@${message.author.id}> đã cải tà quy chính, rửa sạch nghiệp chướng, chính thức được tháo gông!`);
+        }
+    }
 
-        try {
-            // BẬT CHẾ ĐỘ ĐỤNG LÀ CHẠM
-            if (command === 'on') {
-                if (activeJails.has(targetMember.id)) {
-                    return message.reply("Thằng này đang bị treo mỏ rồi, xích gì tới 2 lần?");
-                }
+    // ==========================================
+    // KHU VỰC 2: DÀNH CHO LÃO BẢN (ADMIN)
+    // ==========================================
+    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
+        return message.reply("Cút! Trình độ tép riu mà đòi xài ấn lệnh của Lão Bản à?");
+    }
 
-                message.channel.send(`⛓️ Đã gông cổ thằng ranh con <@${targetMember.id}>! Bắt đầu tụng kinh siêu độ!`);
+    const targetMember = message.mentions.members.first();
+    if (!targetMember) return message.reply("Mắt để trưng à? Phải tag cái thằng tội đồ vào lệnh chứ!");
 
-                // (LÃO BẢN LƯU Ý: Nếu muốn gán role Tù Nhân, ngài bỏ // ở dòng dưới và điền ID role vào)
-                // await targetMember.roles.add('ĐIỀN_ID_ROLE_TÙ_NHÂN_VÀO_ĐÂY');
+    try {
+        // 🧹 LỆNH TÙ MỌT GÔNG (TỘI NHẸ): tntu @user [số lần]
+        if (command === 'tu') {
+            const amount = parseInt(args[1]) || 50; // Mặc định 50 lần nếu Lão Bản quên nhập số
+            await targetMember.roles.add(ROLE_TAP_DICH_ID);
+            laborQuotas.set(targetMember.id, amount);
+            
+            return message.channel.send(`🧹 Đã tống <@${targetMember.id}> vào Tạp Dịch Phòng! \nPhạt gõ lệnh \`tnlaudon\` hoặc \`tnxamhoi\` đủ **${amount} lần** mới được Lão Bản tha mạng! Bắt đầu đi con!`);
+        }
 
-                // Bắt đầu nhịp điệu tra tấn tâm lý (3 giây 1 nhát để né Anti-Spam của Discord)
+        // ⛓️ LỆNH PHẠT TÙ (TỘI NẶNG): tnphattu @user
+        if (command === 'phattu') {
+            await targetMember.roles.add(ROLE_TU_NHAN_ID);
+            return message.channel.send(`⛓️ Đã gông cổ tống <@${targetMember.id}> vào Hắc Địa Lao! Hết đường múa mép!`);
+        }
+
+        // 🕊️ LỆNH THA THỨ ĐẶC XÁ: tnthathu @user
+        if (command === 'thathu') {
+            await targetMember.roles.remove(ROLE_TU_NHAN_ID);
+            await targetMember.roles.remove(ROLE_TAP_DICH_ID);
+            
+            if (activeJails.has(targetMember.id)) {
+                clearInterval(activeJails.get(targetMember.id));
+                activeJails.delete(targetMember.id);
+            }
+            if (laborQuotas.has(targetMember.id)) laborQuotas.delete(targetMember.id);
+            
+            return message.channel.send(`🕊️ Lão Bản từ bi đặc xá, đã mở gông tha mạng cho <@${targetMember.id}>. Liệu hồn mà sống!`);
+        }
+
+        // 🔥 LỆNH HARDMODE (CHỬI LIÊN TỤC): tnhardmode on/off @user
+        if (command === 'hardmode') {
+            const action = args[0]; 
+            if (action === 'on') {
+                if (activeJails.has(targetMember.id)) return message.reply("Nó đang bị chửi vuốt mặt không kịp rồi!");
+                message.channel.send(`🔥 BẬT MODE HỦY DIỆT! Chào mừng <@${targetMember.id}> đến với Lôi Đài!`);
                 const intervalId = setInterval(() => {
-                    // Random 1 câu chửi và gắn tag tên nạn nhân
                     const cauChui = vanTe[Math.floor(Math.random() * vanTe.length)].replace('{user}', `<@${targetMember.id}>`);
                     message.channel.send(cauChui);
                 }, 3000); 
-
-                // Ghi tên nó vào Sổ Tử Thần
                 activeJails.set(targetMember.id, intervalId);
-
-            } 
-            // TẮT CHẾ ĐỘ THA MẠNG
-            else if (command === 'off') {
-                if (!activeJails.has(targetMember.id)) {
-                    return message.reply("Nó có bị xích đâu mà thả? Ngáo à?");
-                }
-
-                // Dừng vòng lặp spam
+            } else if (action === 'off') {
+                if (!activeJails.has(targetMember.id)) return message.reply("Nó có bị xích đâu mà thả?");
                 clearInterval(activeJails.get(targetMember.id));
                 activeJails.delete(targetMember.id);
-                
-                // (LÃO BẢN LƯU Ý: Nếu lúc nãy có add role Tù Nhân, thì giờ gỡ ra ở đây)
-                // await targetMember.roles.remove('ĐIỀN_ID_ROLE_TÙ_NHÂN_VÀO_ĐÂY');
-
-                message.channel.send(`Đã ngừng vả mõm <@${targetMember.id}>. Sống sao cho bớt rác đi con!`);
+                message.channel.send(`Đã thu công lực, ngừng vả mõm <@${targetMember.id}>. Sống sao cho bớt rác đi con!`);
             }
-        } catch (error) {
-            // 🛑 5. KHI LỖI XẢY RA CŨNG PHẢI CHỬI
-            console.error(error); // Ghi log ngầm
-            message.channel.send(`Đờ mờ, thằng ranh này mọc lông mọc cánh hay sao mà xích đéo đứt! \n⚠️ **Lỗi hệ thống:** ${error.message} \nLão Bản đợi xíu, để tui mài lại dao rồi vả nó sau!`);
         }
+    } catch (error) {
+        console.error(error); 
+        message.channel.send(`⚠️ **Lỗi:** ${error.message} \nLão Bản nhớ kiểm tra xem Role Ám Vệ đã xếp TẦNG CAO HƠN Role Tù Nhân chưa nha!`);
     }
 });
 
-process.on('uncaughtException', (error) => {
-    console.error('⚠️ uncaughtException:', error);
-});
-
-process.on('unhandledRejection', (reason) => {
-    console.error('⚠️ unhandledRejection:', reason);
-});
-
-client.on('error', (error) => {
-    console.error('⚠️ Discord client error:', error);
-});
-
-const token = process.env.DISCORD_TOKEN;
-
-if (!token) {
-    console.error('❌ Thiếu DISCORD_TOKEN trong file .env hoặc biến môi trường của máy chủ.');
-    server.close();
-    process.exitCode = 1;
-} else {
-    client.login(token).catch((error) => {
-        console.error('❌ Không thể đăng nhập Discord:', error.message);
-        server.close();
-        process.exitCode = 1;
-    });
-}
-
-const shutdown = async (signal) => {
-    console.log(`Đang tắt Ám Vệ (${signal})...`);
-    for (const intervalId of activeJails.values()) {
-        clearInterval(intervalId);
-    }
-    activeJails.clear();
-    client.destroy();
-    server.close(() => process.exit(0));
-};
-
-process.once('SIGINT', () => shutdown('SIGINT'));
-process.once('SIGTERM', () => shutdown('SIGTERM'));
+client.login(process.env.DISCORD_TOKEN);
