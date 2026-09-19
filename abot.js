@@ -19,7 +19,7 @@ const client = new Client({
 const PREFIX = 'tn';
 const ROLE_TU_NHAN_ID = '1537469644993208412';   // Role Hắc Địa Lao
 const ROLE_TAP_DICH_ID = '1550432222027321374'; // Role Tạp Dịch
-const CATEGORY_TIEU_DAO_ID = '1550391338556596306'; // ID bị nghi là sai
+const CATEGORY_TIEU_DAO_ID = '1369689684997050431'; // ID bị nghi là sai
 
 // Bộ nhớ đệm giữ dữ liệu
 const activeJails = new Map(); 
